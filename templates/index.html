@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Estación Meteorológica - BMP280</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #121212;
+            color: #ffffff;
+            margin: 0;
+            padding: 20px;
+            text-align: center;
+        }
+        h1 { color: #bb86fc; margin-bottom: 5px; }
+        p.subtitulo { color: #a0a0a0; margin-bottom: 30px; }
+        
+        .contenedor-tarjetas {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            flex-wrap: wrap;
+            margin-bottom: 40px;
+        }
+        .tarjeta {
+            background-color: #1e1e1e;
+            border-radius: 12px;
+            padding: 20px;
+            width: 220px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+            border-top: 4px solid #03dac6;
+        }
+        .tarjeta h3 { margin: 0; font-size: 16px; color: #b0b0b0; }
+        .tarjeta .valor { font-size: 32px; font-weight: bold; margin: 15px 0; color: #ffffff; }
+        .tarjeta .unidad { font-size: 14px; color: #03dac6; }
+
+        .contenedor-graficas {
+            display: flex;
+            justify-content: center;
+            gap: 30px;
+            flex-wrap: wrap;
+            max-width: 1100px;
+            margin: 0 auto;
+        }
+        .caja-grafica {
+            background-color: #1e1e1e;
+            padding: 20px;
+            border-radius: 12px;
+            width: 480px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+        }
+    </style>
+</head>
+<body>
+
+    <h1>Monitor Ambiental BMP280</h1>
+    <p class="subtitulo">Última actualización: <span id="hora">--:--:--</span></p>
+
+    <!-- Tarjetas de datos en tiempo real -->
+    <div class="contenedor-tarjetas">
+        <div class="tarjeta">
+            <h3>Temperatura</h3>
+            <div class="valor" id="temp">--</div>
+            <div class="unidad">°C</div>
+        </div>
+        <div class="tarjeta" style="border-top-color: #bb86fc;">
+            <h3>Presión Atmosférica</h3>
+            <div class="valor" id="pres">--</div>
+            <div class="unidad">hPa</div>
+        </div>
+        <div class="tarjeta" style="border-top-color: #cf6679;">
+            <h3>Altitud Estimada</h3>
+            <div class="valor" id="alt">--</div>
+            <div class="unidad">metros</div>
+        </div>
+        <div class="tarjeta" style="border-top-color: #666666;">
+            <h3>Humedad</h3>
+            <div class="valor" id="hum" style="font-size: 18px; padding-top: 10px;">N/A</div>
+            <div class="unidad">Sensor BMP280</div>
+        </div>
+    </div>
+
+    <!-- Gráficas de historial -->
+    <div class="contenedor-graficas">
+        <div class="caja-grafica">
+            <canvas id="graficaTemp"></canvas>
+        </div>
+        <div class="caja-grafica">
+            <canvas id="graficaPres"></canvas>
+        </div>
+    </div>
+
+    <script>
+        // Configuración inicial de gráficas
+        const ctxTemp = document.getElementById('graficaTemp').getContext('2d');
+        const graficaTemp = new Chart(ctxTemp, {
+            type: 'line',
+            data: { labels: [], datasets: [{ label: 'Temperatura (°C)', data: [], borderColor: '#03dac6', tension: 0.3 }] },
+            options: { scales: { y: { beginAtZero: false } } }
+        });
+
+        const ctxPres = document.getElementById('graficaPres').getContext('2d');
+        const graficaPres = new Chart(ctxPres, {
+            type: 'line',
+            data: { labels: [], datasets: [{ label: 'Presión (hPa)', data: [], borderColor: '#bb86fc', tension: 0.3 }] },
+            options: { scales: { y: { beginAtZero: false } } }
+        });
+
+        // Función para actualizar tarjetas e historial cada 3 segundos
+        async function actualizarDatos() {
+            try {
+                // 1. Obtener dato actual
+                const resActual = await fetch('/api/actual');
+                const actual = await resActual.json();
+                
+                document.getElementById('temp').innerText = actual.temperatura.toFixed(1);
+                document.getElementById('pres').innerText = actual.presion.toFixed(1);
+                document.getElementById('alt').innerText = actual.altitud.toFixed(1);
+                document.getElementById('hum').innerText = actual.humedad;
+                document.getElementById('hora').innerText = actual.hora;
+
+                // 2. Obtener historial para las gráficas
+                const resHist = await fetch('/api/historial');
+                const hist = await resHist.json();
+
+                graficaTemp.data.labels = hist.horas;
+                graficaTemp.data.datasets[0].data = hist.temperaturas;
+                graficaTemp.update();
+
+                graficaPres.data.labels = hist.horas;
+                graficaPres.data.datasets[0].data = hist.presiones;
+                graficaPres.update();
+
+            } catch (error) {
+                console.error("Error obteniendo datos:", error);
+            }
+        }
+
+        setInterval(actualizarDatos, 3000);
+        actualizarDatos();
+    </script>
+</body>
+</html>
